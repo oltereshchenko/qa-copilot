@@ -582,9 +582,10 @@ def chat():
     if not messages:
         return jsonify({"error": "No messages provided."}), 400
 
+    client = get_client()
     def generate():
         try:
-            stream = get_client().chat.completions.create(
+            stream = client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": CHAT_SYSTEM_PROMPT},
@@ -604,9 +605,10 @@ def chat():
 
 
 def _stream_completion(system_prompt, user_message, model="gpt-4o"):
+    client = get_client()
     def generate():
         try:
-            stream = get_client().chat.completions.create(
+            stream = client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": system_prompt},
