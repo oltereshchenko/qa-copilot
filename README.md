@@ -2,6 +2,10 @@
 
 An AI-powered QA productivity tool built for the Vic.ai AI Hackathon (April 2025).
 
+## Demo Video
+
+[Watch the demo on Loom](https://www.loom.com/share/d55c6d8fc7cf42db9501edc604bf3b12)
+
 ## Problem
 
 Manual QA engineers spend a significant amount of time on repetitive, high-effort tasks that slow down the development cycle:
