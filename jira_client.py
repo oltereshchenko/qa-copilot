@@ -697,14 +697,14 @@ def get_notifications(username, since_minutes=60):
     since_jql = (datetime.utcnow() - timedelta(minutes=since_minutes + 60)).strftime("%Y-%m-%d %H:%M")
 
     jql = (
-        f'(assignee = "{account_id}" OR watcher = "{account_id}") '
+        f'(assignee = "{account_id}" OR reporter = "{account_id}" OR watcher = "{account_id}") '
         f'AND updated >= "{since_jql}" '
         f'ORDER BY updated DESC'
     )
     url = f"{_base_url()}/rest/api/3/search/jql"
     payload = {
         "jql": jql,
-        "maxResults": 15,
+        "maxResults": 30,
         "fields": ["summary", "status", "issuetype", "comment", "updated"],
     }
 

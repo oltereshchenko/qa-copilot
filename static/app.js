@@ -3,6 +3,7 @@ const THEME_STORAGE = 'qa-copilot-theme';
 const HISTORY_STORAGE = 'qa-copilot-history';
 const SETTINGS_STORAGE = 'qa-copilot-settings';
 const FAVORITES_STORAGE = 'qa-copilot-favorites';
+const DRAFTS_STORAGE = 'qa-copilot-drafts';
 const MAX_RECENT_KEYS = 5;
 const MAX_HISTORY = 20;
 let _uploadedFiles = [];
@@ -32,6 +33,43 @@ document.addEventListener('DOMContentLoaded', () => {
   initFullscreen();
   initChat();
   initNotifications();
+  initDraftPersistence();
+});
+
+const _draftFields = ['analyze-input', 'testcases-input', 'bugreport-input', 'chat-input'];
+
+function initDraftPersistence() {
+  const saved = JSON.parse(localStorage.getItem(DRAFTS_STORAGE) || '{}');
+  _draftFields.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    if (saved[id]) el.value = saved[id];
+    el.addEventListener('input', _saveDrafts);
+  });
+  window.addEventListener('beforeunload', _saveDrafts);
+}
+
+function _saveDrafts() {
+  const drafts = {};
+  _draftFields.forEach(id => {
+    const el = document.getElementById(id);
+    if (el && el.value.trim()) drafts[id] = el.value;
+  });
+  localStorage.setItem(DRAFTS_STORAGE, JSON.stringify(drafts));
+}
+
+function _clearDraft(fieldId) {
+  const drafts = JSON.parse(localStorage.getItem(DRAFTS_STORAGE) || '{}');
+  delete drafts[fieldId];
+  localStorage.setItem(DRAFTS_STORAGE, JSON.stringify(drafts));
+}
+
+let _activeModalClose = null;
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && _activeModalClose) {
+    _activeModalClose();
+    _activeModalClose = null;
+  }
 });
 
 function initTheme() {
@@ -61,12 +99,37 @@ function initTabs() {
   const brand = document.getElementById('sidebar-brand');
   if (brand) {
     brand.addEventListener('click', () => switchTab('dashboard'));
+    brand.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        switchTab('dashboard');
+      }
+    });
   }
 
-  refreshDashboard();
+  window.addEventListener('popstate', (e) => {
+    const tab = (e.state && e.state.tab) ? e.state.tab : getTabFromPath();
+    switchTab(tab, false);
+  });
+
+  const initialTab = getTabFromPath();
+  switchTab(initialTab, false);
+  history.replaceState({ tab: initialTab }, '', TAB_ROUTES[initialTab] || '/dashboard');
 }
 
-function switchTab(tabName) {
+const TAB_ROUTES = {
+  dashboard:  '/dashboard',
+  analyze:    '/analyze',
+  testcases:  '/test-cases',
+  bugreport:  '/bug-report',
+  daily:      '/daily-summary',
+  settings:   '/settings',
+};
+const ROUTE_TO_TAB = Object.fromEntries(
+  Object.entries(TAB_ROUTES).map(([tab, path]) => [path, tab])
+);
+
+function switchTab(tabName, pushState = true) {
   const navItems = document.querySelectorAll('.nav-item');
   navItems.forEach(n => n.classList.remove('active'));
   document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
@@ -75,6 +138,35 @@ function switchTab(tabName) {
   const tabEl = document.getElementById(`tab-${tabName}`);
   if (tabEl) tabEl.classList.add('active');
   if (tabName === 'dashboard') refreshDashboard();
+
+  const main = document.querySelector('.main');
+  if (main) main.scrollTo(0, 0);
+
+  if (pushState) {
+    const path = TAB_ROUTES[tabName] || '/dashboard';
+    if (window.location.pathname !== path) {
+      history.pushState({ tab: tabName }, '', path);
+    }
+  }
+  document.title = _tabTitle(tabName);
+}
+
+function _tabTitle(tabName) {
+  const titles = {
+    dashboard: 'Dashboard — QA Copilot',
+    analyze: 'Analyze Story — QA Copilot',
+    testcases: 'Test Cases — QA Copilot',
+    bugreport: 'Bug Report — QA Copilot',
+    daily: 'Daily Summary — QA Copilot',
+    settings: 'Settings — QA Copilot',
+  };
+  return titles[tabName] || 'QA Copilot';
+}
+
+function getTabFromPath() {
+  const path = window.location.pathname.replace(/\/+$/, '') || '/';
+  if (path === '/') return 'dashboard';
+  return ROUTE_TO_TAB[path] || 'dashboard';
 }
 
 function switchToTestCasesWithInput(inputText, jiraKey) {
@@ -362,7 +454,7 @@ function showToast(message, type = 'info') {
   toast.className = `toast toast-${type}`;
   toast.innerHTML = `
     <span class="toast-icon"><i data-lucide="${iconName}"></i></span>
-    <span class="toast-msg">${message}</span>
+    <span class="toast-msg">${_esc(message)}</span>
     <button class="toast-close"><i data-lucide="x" style="width:14px;height:14px"></i></button>
   `;
 
@@ -615,6 +707,7 @@ function postJiraComment(issueKey, markdown, btn) {
 
   document.getElementById('comment-cancel').addEventListener('click', closeModal);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+  _activeModalClose = closeModal;
 
   document.getElementById('comment-confirm').addEventListener('click', async () => {
     const confirmBtn = document.getElementById('comment-confirm');
@@ -663,7 +756,7 @@ function renderErrorCard(message) {
     <div class="error-card-icon"><i data-lucide="triangle-alert" style="width:18px;height:18px;color:var(--red)"></i></div>
     <div class="error-card-body">
       <div class="error-card-title">Something went wrong</div>
-      <div class="error-card-msg">${message}</div>
+      <div class="error-card-msg">${_esc(message)}</div>
     </div>
   </div>`;
 }
@@ -780,6 +873,7 @@ async function showJiraCreateDialog(markdown, btn, isQuick = false, prefilled = 
 
   document.getElementById('jira-create-cancel').addEventListener('click', closeModal);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+  _activeModalClose = closeModal;
 
   document.getElementById('jira-create-confirm').addEventListener('click', async () => {
     const confirmBtn = document.getElementById('jira-create-confirm');
@@ -1042,6 +1136,7 @@ async function showQasePushDialog(markdown, btn, defaultSuiteName = '') {
 
   document.getElementById('qase-cancel').addEventListener('click', closeModal);
   overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal(); });
+  _activeModalClose = closeModal;
 
   document.getElementById('qase-confirm').addEventListener('click', async () => {
     const confirmBtn = document.getElementById('qase-confirm');
@@ -2229,16 +2324,29 @@ async function dashSearch(query) {
 
 /* ─── AI Summary on Cards ─── */
 async function showAISummary(btn, issueKey) {
-  const card = btn.closest('.kanban-card');
-  let popup = card.querySelector('.kanban-summary-popup');
-  if (popup) { popup.remove(); return; }
+  const existing = document.querySelector('.kanban-summary-overlay');
+  if (existing) { existing.remove(); return; }
 
-  popup = document.createElement('div');
+  const overlay = document.createElement('div');
+  overlay.className = 'kanban-summary-overlay';
+  const popup = document.createElement('div');
   popup.className = 'kanban-summary-popup';
-  popup.innerHTML = '<i data-lucide="loader" class="spin" style="width:14px;height:14px"></i> Generating summary...';
-  card.style.position = 'relative';
-  card.appendChild(popup);
+  popup.innerHTML = `
+    <div class="kanban-summary-header">
+      <h3><i data-lucide="sparkles" style="width:16px;height:16px;display:inline;vertical-align:-2px;color:var(--accent)"></i> AI Summary — ${_esc(issueKey)}</h3>
+      <button class="kanban-summary-close" title="Close"><i data-lucide="x" style="width:16px;height:16px"></i></button>
+    </div>
+    <div class="kanban-summary-body" style="display:flex;align-items:center;gap:8px;color:var(--text-tertiary)">
+      <i data-lucide="loader" class="spin" style="width:16px;height:16px"></i> Generating AI summary...
+    </div>`;
+  overlay.appendChild(popup);
+  document.body.appendChild(overlay);
   refreshIcons();
+
+  const close = () => { overlay.remove(); _activeModalClose = null; };
+  overlay.addEventListener('click', (e) => { if (e.target === overlay) close(); });
+  popup.querySelector('.kanban-summary-close').addEventListener('click', close);
+  _activeModalClose = close;
 
   try {
     const res = await fetch('/api/ai/summary', {
@@ -2247,22 +2355,16 @@ async function showAISummary(btn, issueKey) {
       body: JSON.stringify({ issue_key: issueKey, model: getSelectedModel() }),
     });
     const data = await res.json();
+    const body = popup.querySelector('.kanban-summary-body');
     if (data.error) {
-      popup.innerHTML = `<span style="color:var(--red)">${_esc(data.error)}</span>`;
+      body.innerHTML = `<span style="color:var(--red)">${_esc(data.error)}</span>`;
     } else {
-      popup.innerHTML = marked.parse(data.summary || 'No summary');
+      body.innerHTML = marked.parse(data.summary || 'No summary');
     }
   } catch {
-    popup.innerHTML = '<span style="color:var(--red)">Failed to generate summary</span>';
+    popup.querySelector('.kanban-summary-body').innerHTML = '<span style="color:var(--red)">Failed to generate summary</span>';
   }
-
-  popup.addEventListener('click', (e) => e.stopPropagation());
-  document.addEventListener('click', function handler(e) {
-    if (!popup.contains(e.target) && !btn.contains(e.target)) {
-      popup.remove();
-      document.removeEventListener('click', handler);
-    }
-  });
+  refreshIcons();
 }
 
 /* ─── Smart Suggestions ─── */
@@ -2591,6 +2693,14 @@ async function sendChatMessage() {
     });
 
     const bubble = botMsg.querySelector('.chat-msg-bubble');
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `Server error (${res.status})` }));
+      bubble.innerHTML = `<span style="color:var(--red)">${_esc(err.error || 'Server error')}</span>`;
+      _chatMessages.pop();
+      return;
+    }
+
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let fullText = '';

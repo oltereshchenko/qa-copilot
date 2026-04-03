@@ -29,6 +29,24 @@ def get_client():
     return OpenAI(api_key=api_key)
 
 
+@app.after_request
+def add_security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' https://unpkg.com https://cdn.jsdelivr.net 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob:; "
+        "connect-src 'self'; "
+        "font-src 'self'; "
+        "frame-ancestors 'none'"
+    )
+    return response
+
+
 @app.before_request
 def inject_credentials():
     jira_url = request.headers.get("X-Jira-Url", "").strip()
@@ -165,6 +183,12 @@ Guidelines:
 
 
 @app.route("/")
+@app.route("/dashboard")
+@app.route("/analyze")
+@app.route("/test-cases")
+@app.route("/bug-report")
+@app.route("/daily-summary")
+@app.route("/settings")
 def index():
     return render_template("index.html")
 
@@ -386,15 +410,15 @@ def ai_summary():
     if not issue_key:
         return jsonify({"error": "Issue key required"}), 400
     try:
-        issue = fetch_issue(issue_key)
+        issue_text = fetch_issue(issue_key)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
     model = data.get("model", "gpt-4o-mini")
-    prompt = f"Summarize this Jira issue in 2-3 concise bullet points for a QA engineer. Focus on what needs to be tested and key acceptance criteria.\n\nKey: {issue.get('key')}\nTitle: {issue.get('summary')}\nStatus: {issue.get('status')}\nDescription:\n{issue.get('description','No description')}"
+    prompt = f"Summarize this Jira issue in 2-3 concise bullet points for a QA engineer. Focus on what needs to be tested and key acceptance criteria.\n\n{issue_text}"
 
     try:
-        client = OpenAI()
+        client = get_client()
         resp = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
@@ -422,7 +446,7 @@ def ai_suggestions():
     )
 
     try:
-        client = OpenAI()
+        client = get_client()
         resp = client.chat.completions.create(
             model=model,
             messages=[{"role": "user", "content": prompt}],
