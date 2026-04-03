@@ -1723,7 +1723,7 @@ function renderHistory() {
   container.innerHTML = history.map(h => {
     const iconName = h.type === 'Analyze' ? 'scan-search' : h.type === 'Test Cases' ? 'clipboard-check' : 'bug';
     const isFav = getFavorites().some(f => f.label === h.label && f.type === h.type);
-    return `<button class="history-item" data-id="${h.id}">
+    return `<div class="history-item" data-id="${h.id}">
       <span class="history-icon"><i data-lucide="${iconName}" style="width:13px;height:13px"></i></span>
       <span class="history-info">
         <span class="history-label">${escapeAttr(h.label)}</span>
@@ -1731,7 +1731,7 @@ function renderHistory() {
       </span>
       <button class="history-fav ${isFav ? 'is-fav' : ''}" data-id="${h.id}" title="${isFav ? 'Already in favorites' : 'Add to favorites'}"><i data-lucide="star" style="width:12px;height:12px"></i></button>
       <button class="history-delete" data-id="${h.id}" title="Delete"><i data-lucide="x" style="width:12px;height:12px"></i></button>
-    </button>`;
+    </div>`;
   }).join('');
   refreshIcons();
 
@@ -1808,14 +1808,14 @@ function loadHistoryEntry(entry) {
   if (output) {
     const isFav = getFavorites().some(f => f.label === entry.label && f.type === entry.type);
     const favBtnHtml = `<div class="output-actions" style="margin-bottom:12px;">
-      <button class="btn-favorite ${isFav ? 'is-fav' : ''}" id="history-fav-btn">
+      <button class="btn-favorite ${isFav ? 'is-fav' : ''}" data-role="history-fav">
         <i data-lucide="star" class="btn-icon"></i> ${isFav ? 'Saved' : 'Favorite'}
       </button>
     </div>`;
     output.innerHTML = favBtnHtml + `<div class="output-content">${marked.parse(entry.result)}</div>`;
     refreshIcons();
 
-    const favBtn = document.getElementById('history-fav-btn');
+    const favBtn = output.querySelector('[data-role="history-fav"]');
     if (favBtn) {
       favBtn.addEventListener('click', () => {
         const existing = getFavorites().find(f => f.label === entry.label && f.type === entry.type);
@@ -2468,14 +2468,14 @@ function renderFavorites() {
   }
   container.innerHTML = favs.map(h => {
     const iconName = h.type === 'Analyze' ? 'scan-search' : h.type === 'Test Cases' ? 'clipboard-check' : 'bug';
-    return `<button class="history-item" data-id="${h.id}">
+    return `<div class="history-item" data-id="${h.id}">
       <span class="history-icon"><i data-lucide="${iconName}" style="width:13px;height:13px"></i></span>
       <span class="history-info">
         <span class="history-label">${escapeAttr(h.label)}</span>
         <span class="history-date">${h.date}</span>
       </span>
       <button class="history-delete" data-id="${h.id}" title="Remove"><i data-lucide="x" style="width:12px;height:12px"></i></button>
-    </button>`;
+    </div>`;
   }).join('');
   refreshIcons();
 
