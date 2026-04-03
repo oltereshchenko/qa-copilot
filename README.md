@@ -6,6 +6,37 @@ An AI-powered QA productivity tool built for the Vic.ai AI Hackathon (April 2025
 
 [Watch the demo on Loom](https://www.loom.com/share/d55c6d8fc7cf42db9501edc604bf3b12)
 
+<details>
+<summary>Video Transcript</summary>
+
+**[0:00]** Hello guys, my name is Alexey. I built QA Copilot for the Vic.ai Hackathon. Let me show you what it does and why.
+
+**[0:11]** As a manual QA engineer, I spend a lot of time creating test cases, analyzing user stories, creating bug reports, and everything else. Around 30 minutes to one hour per user story just to read, analyze, and create test cases. It also takes a lot of time switching between different Jira boards. So I built QA Copilot to make our life a little bit easier.
+
+**[0:51]** First, to use the application you need to add all credentials in Settings. You add your OpenAI API key, Jira base URL, Jira email, Jira token, and optionally Qase API token and project code for test case management. You also add your Jira username to see all tickets assigned to you. There are settings for AI model selection (two models — one cheaper, one better), notification preferences, and Qase defaults. At the bottom you can see connection status — everything green means everything is connected.
+
+**[2:10]** On the Dashboard you can see the current sprint info — sprint number, dates, days remaining, how many stories are done. It's integrated with Jira, pulling all information automatically. You can select your team. Below that, you see all Jira tickets assigned to you across three boards: the main engineering board, production incidents, and the implementation board — all with different status columns, all in one place.
+
+**[3:27]** When you hover over any ticket, there are four quick actions: open in Jira, generate test cases, analyze the user story, and get an AI summary. The AI summary gives you a quick overview of the ticket without opening Jira.
+
+**[4:08]** Clicking Analyze opens the Analyze tab with the story pre-filled. You see all requirements from Jira. Click "Analyze User Story" and AI returns a testability score, completeness checks, missing scenarios, clarifying questions, and a ready-to-paste Jira comment. You can post this comment directly to the Jira ticket with one click.
+
+**[5:26]** For test cases, click the generate button. AI generates structured test cases. Click "Push to Qase" — you can add to an existing suite or create a new one with an auto-populated name. Select a parent folder and push. Test cases appear in Qase immediately with all details.
+
+**[7:12]** The Bug Report tab has a template you can insert. Fill in the details, then click "Quick Create in Jira." All fields are pre-populated — summary, space, work type, feature team, labels. Adjust if needed and create. The Jira ticket is created instantly.
+
+**[8:40]** Daily Summary has two options: generate from QA Copilot history or from Jira Activity. Select Jira Activity, pick a date, and generate a summary of what was done. Copy it and use it for your daily standup.
+
+**[9:17]** Notifications show when tickets are updated or someone comments on your Jira issues. You can see new notifications and notification history. Clicking a notification opens the Jira ticket.
+
+**[9:36]** History saves all previous AI results. Click any entry to reload it. You can mark results as favorites for quick access.
+
+**[10:46]** The AI Chat assistant is available via the floating button. Ask it anything — help with test cases, analysis, prioritization, or any QA-related questions.
+
+**[11:19]** This is the basic functionality for the hackathon. More features will be added going forward.
+
+</details>
+
 ## Problem
 
 Manual QA engineers spend a significant amount of time on repetitive, high-effort tasks that slow down the development cycle:
