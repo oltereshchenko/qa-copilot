@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QA Copilot</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='16' fill='%236366F1'/><text y='72' x='50' text-anchor='middle' font-size='50' font-family='-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif' font-weight='bold' fill='white'>QA</text></svg>" />
+  <link rel="stylesheet" href="/static/style.css" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="sidebar-brand" id="sidebar-brand" role="button" tabindex="0" title="Go to Dashboard">
+        <div class="brand-icon"><i data-lucide="sparkles" class="brand-lucide"></i></div>
+        <h1>QA Copilot</h1>
+      </div>
+
+      <nav class="sidebar-nav">
+        <button class="nav-item active" data-tab="dashboard">
+          <span class="nav-icon"><i data-lucide="layout-dashboard"></i></span>
+          <span class="nav-label">Dashboard</span>
+          <span class="nav-desc">Overview & tasks</span>
+        </button>
+        <button class="nav-item" data-tab="analyze">
+          <span class="nav-icon"><i data-lucide="scan-search"></i></span>
+          <span class="nav-label">Analyze Story</span>
+          <span class="nav-desc">Review & find gaps</span>
+        </button>
+        <button class="nav-item" data-tab="testcases">
+          <span class="nav-icon"><i data-lucide="clipboard-check"></i></span>
+          <span class="nav-label">Test Cases</span>
+          <span class="nav-desc">Generate from story</span>
+        </button>
+        <button class="nav-item" data-tab="bugreport">
+          <span class="nav-icon"><i data-lucide="bug"></i></span>
+          <span class="nav-label">Bug Report</span>
+          <span class="nav-desc">Quick to polished</span>
+        </button>
+        <button class="nav-item" data-tab="daily">
+          <span class="nav-icon"><i data-lucide="bar-chart-3"></i></span>
+          <span class="nav-label">Daily Summary</span>
+          <span class="nav-desc">Standup report</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-favorites" id="sidebar-favorites" hidden>
+        <div class="history-header">
+          <span class="history-title"><i data-lucide="star" style="width:11px;height:11px;color:var(--yellow)"></i> Favorites</span>
+        </div>
+        <div class="history-list" id="favorites-list"></div>
+      </div>
+
+      <div class="sidebar-history">
+        <div class="history-header">
+          <span class="history-title">History</span>
+          <button class="history-clear-btn" id="history-clear" title="Clear all">Clear</button>
+        </div>
+        <div class="history-list" id="history-list"></div>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="notif-bar">
+          <button class="notif-bell" id="notif-bell" title="Jira Notifications">
+            <i data-lucide="bell" style="width:16px;height:16px"></i>
+            <span class="notif-badge" id="notif-badge" hidden>0</span>
+          </button>
+          <div class="notif-dropdown" id="notif-dropdown">
+            <div class="notif-header">
+              <span>Notifications</span>
+              <div class="notif-header-actions">
+                <button class="notif-mark-read" id="notif-mark-read">Mark all read</button>
+                <button class="notif-close" id="notif-close" title="Close"><i data-lucide="x" style="width:14px;height:14px"></i></button>
+              </div>
+            </div>
+            <div class="notif-tabs">
+              <button class="notif-tab active" data-notif-tab="new">New</button>
+              <button class="notif-tab" data-notif-tab="history">History</button>
+            </div>
+            <div class="notif-list" id="notif-list">
+              <div class="notif-empty">No new notifications</div>
+            </div>
+            <div class="notif-list notif-history-list" id="notif-history-list" style="display:none">
+              <div class="notif-empty">No notification history</div>
+            </div>
+          </div>
+        </div>
+        <button class="nav-item" data-tab="settings" id="nav-settings">
+          <span class="nav-icon"><i data-lucide="settings"></i></span>
+          <span class="nav-label">Settings</span>
+        </button>
+        <button class="theme-toggle" id="theme-toggle" title="Toggle theme">
+          <span class="theme-icon-dark"><i data-lucide="moon" style="width:14px;height:14px"></i> Dark</span>
+          <span class="theme-icon-light"><i data-lucide="sun" style="width:14px;height:14px"></i> Light</span>
+        </button>
+        <div class="sidebar-hint">Built for Vic.ai Hackathon 2025</div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <!-- Model Selector Pill (global) -->
+      <div class="model-selector" id="model-selector">
+        <i data-lucide="cpu" style="width:13px;height:13px;color:var(--text-muted)"></i>
+        <select id="model-quick-select">
+          <option value="gpt-4o">GPT-4o</option>
+          <option value="gpt-4o-mini">GPT-4o-mini</option>
+        </select>
+      </div>
+
+      <!-- Dashboard -->
+      <section class="tab-content active" id="tab-dashboard">
+        <div class="tab-header">
+          <div>
+            <h2><i data-lucide="layout-dashboard" class="header-icon"></i> Dashboard</h2>
+            <p>Your QA workspace at a glance</p>
+          </div>
+        </div>
+
+        <!-- Sprint + Search Row -->
+        <div class="dash-row">
+          <div class="dash-card dash-sprint" id="dash-sprint">
+            <div class="dash-sprint-loading"><i data-lucide="loader" class="spin" style="width:16px;height:16px"></i></div>
+          </div>
+          <div class="dash-card dash-search-card">
+            <h3><i data-lucide="search" class="section-icon"></i> Quick Jira Search</h3>
+            <div class="dash-search-wrap">
+              <input type="text" class="dash-search-input" id="dash-search-input" placeholder="Search by key or text... (e.g. ENG-12345)" />
+              <div class="dash-search-results" id="dash-search-results"></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dash-grid">
+          <div class="dash-card dash-stat" id="dash-stat-analyses">
+            <div class="dash-stat-icon"><i data-lucide="scan-search"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dash-val-analyses">0</span>
+              <span class="dash-stat-label">Analyses Today</span>
+            </div>
+          </div>
+          <div class="dash-card dash-stat" id="dash-stat-testcases">
+            <div class="dash-stat-icon"><i data-lucide="clipboard-check"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dash-val-testcases">0</span>
+              <span class="dash-stat-label">Test Cases Today</span>
+            </div>
+          </div>
+          <div class="dash-card dash-stat" id="dash-stat-bugs">
+            <div class="dash-stat-icon"><i data-lucide="bug"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dash-val-bugs">0</span>
+              <span class="dash-stat-label">Bug Reports Today</span>
+            </div>
+          </div>
+          <div class="dash-card dash-stat" id="dash-stat-total">
+            <div class="dash-stat-icon"><i data-lucide="activity"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dash-val-total">0</span>
+              <span class="dash-stat-label">Total All Time</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="dash-row">
+          <div class="dash-card dash-jira-issues" style="grid-column: 1 / -1;">
+            <div class="dash-jira-header">
+              <h3><i data-lucide="clipboard-list" class="section-icon"></i> My Jira Tasks <span class="dash-jira-count" id="dash-jira-count"></span></h3>
+              <button class="dash-jira-refresh" id="dash-jira-refresh" title="Refresh"><i data-lucide="refresh-cw" style="width:14px;height:14px"></i></button>
+            </div>
+            <div class="dash-jira-list" id="dash-jira-list">
+              <div class="dash-empty"><i data-lucide="loader" class="spin" style="width:16px;height:16px"></i> Loading...</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dash-row">
+          <div class="dash-card dash-actions">
+            <h3><i data-lucide="zap" class="section-icon"></i> Quick Actions</h3>
+            <div class="dash-action-grid">
+              <button class="dash-action-btn" data-goto="analyze">
+                <i data-lucide="scan-search"></i>
+                <span>Analyze Story</span>
+              </button>
+              <button class="dash-action-btn" data-goto="testcases">
+                <i data-lucide="clipboard-check"></i>
+                <span>Generate Tests</span>
+              </button>
+              <button class="dash-action-btn" data-goto="bugreport">
+                <i data-lucide="bug"></i>
+                <span>Write Bug</span>
+              </button>
+              <button class="dash-action-btn" data-goto="daily">
+                <i data-lucide="bar-chart-3"></i>
+                <span>Daily Summary</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="dash-card dash-recent">
+            <h3><i data-lucide="clock" class="section-icon"></i> Recent Activity</h3>
+            <div class="dash-recent-list" id="dash-recent-list">
+              <div class="dash-empty">No recent activity</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dash-row">
+          <div class="dash-card dash-suggestions" style="grid-column: 1 / -1;">
+            <div class="dash-suggestions-header">
+              <h3><i data-lucide="lightbulb" class="section-icon"></i> Smart Suggestions</h3>
+              <button class="dash-suggestions-btn" id="dash-suggestions-btn"><i data-lucide="sparkles" style="width:14px;height:14px"></i> Get AI Suggestions</button>
+            </div>
+            <div class="dash-suggestions-body" id="dash-suggestions-body">
+              <div class="dash-empty">Click the button to get AI-powered suggestions based on your current tasks</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="dash-row">
+          <div class="dash-card dash-tips">
+            <h3><i data-lucide="lightbulb" class="section-icon"></i> QA Tips</h3>
+            <div class="dash-tip" id="dash-tip">
+              <p></p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Analyze Tab -->
+      <section class="tab-content" id="tab-analyze">
+        <div class="tab-header">
+          <div>
+            <h2><i data-lucide="scan-search" class="header-icon"></i> Analyze User Story</h2>
+            <p>Paste a Jira user story below. AI will review it for completeness, ambiguity, missing scenarios, and generate clarifying questions.</p>
+          </div>
+        </div>
+        <div class="workspace">
+          <div class="input-panel">
+            <div class="jira-fetch-bar">
+              <input type="text" class="jira-key-input" id="analyze-jira-key" placeholder="PROJ-123 or PROJ-1, PROJ-2, PROJ-3" />
+              <button class="btn-fetch" data-target="analyze-input"><i data-lucide="download" class="btn-icon"></i> Fetch</button>
+              <button class="btn-bulk" id="bulk-analyze-btn" title="Fetch & analyze multiple keys"><i data-lucide="zap" class="btn-icon"></i> Bulk</button>
+              <div class="recent-keys"></div>
+            </div>
+            <div class="jira-preview" id="analyze-preview" hidden></div>
+            <label for="analyze-input" class="textarea-label">User Story <button class="btn-toggle-raw" id="analyze-toggle" hidden>Show raw text</button></label>
+            <textarea id="analyze-input" placeholder="As a [user role], I want to [action/goal] so that [benefit/value]&#10;&#10;Acceptance Criteria:&#10;- ...&#10;- ...&#10;&#10;Paste the full Jira ticket content here, or use 'Fetch from Jira' above."></textarea>
+            <div class="btn-row">
+              <button class="btn-primary" id="analyze-btn">
+                <span class="btn-text"><i data-lucide="sparkles" class="btn-icon"></i> Analyze Story</span>
+                <span class="btn-loader" hidden>Analyzing...</span>
+              </button>
+              <button class="btn-generate-tc" id="analyze-gen-tc-btn"><i data-lucide="clipboard-check" class="btn-icon"></i> Generate Test Cases</button>
+            </div>
+          </div>
+          <div class="output-panel" id="analyze-output">
+            <button class="btn-fullscreen" title="Fullscreen"><i data-lucide="maximize-2" style="width:14px;height:14px"></i></button>
+            <div class="output-placeholder">
+              <i data-lucide="scan-search" class="placeholder-lucide"></i>
+              <p>Analysis results will appear here</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Test Cases Tab -->
+      <section class="tab-content" id="tab-testcases">
+        <div class="tab-header">
+          <div>
+            <h2><i data-lucide="clipboard-check" class="header-icon"></i> Generate Test Cases</h2>
+            <p>Paste a user story and get structured, ready-to-use test cases covering positive, negative, and edge case scenarios.</p>
+          </div>
+        </div>
+        <div class="workspace">
+          <div class="input-panel">
+            <div class="jira-fetch-bar">
+              <input type="text" class="jira-key-input" id="testcases-jira-key" placeholder="PROJ-123" />
+              <button class="btn-fetch" data-target="testcases-input"><i data-lucide="download" class="btn-icon"></i> Fetch</button>
+              <div class="recent-keys"></div>
+            </div>
+            <div class="jira-preview" id="testcases-preview" hidden></div>
+            <label for="testcases-input" class="textarea-label">User Story <button class="btn-toggle-raw" id="testcases-toggle" hidden>Show raw text</button></label>
+            <textarea id="testcases-input" placeholder="Paste the Jira ticket content here, or use 'Fetch from Jira' above.&#10;&#10;The more context you provide, the better the test cases will be."></textarea>
+            <button class="btn-primary" id="testcases-btn">
+              <span class="btn-text"><i data-lucide="sparkles" class="btn-icon"></i> Generate Test Cases</span>
+              <span class="btn-loader" hidden>Generating...</span>
+            </button>
+          </div>
+          <div class="output-panel" id="testcases-output">
+            <button class="btn-fullscreen" title="Fullscreen"><i data-lucide="maximize-2" style="width:14px;height:14px"></i></button>
+            <div class="output-placeholder">
+              <i data-lucide="clipboard-check" class="placeholder-lucide"></i>
+              <p>Test cases will appear here</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Bug Report Tab -->
+      <section class="tab-content" id="tab-bugreport">
+        <div class="tab-header">
+          <div>
+            <h2><i data-lucide="bug" class="header-icon"></i> Write Bug Report</h2>
+            <p>Describe the bug in your own words — rough and quick is fine. AI will turn it into a structured, professional Jira bug report.</p>
+          </div>
+        </div>
+        <div class="workspace">
+          <div class="input-panel">
+            <div class="label-row">
+              <label for="bugreport-input">Bug Description</label>
+              <button class="btn-template" id="insert-template-btn"><i data-lucide="clipboard-list" class="btn-icon"></i> Insert Template</button>
+            </div>
+            <textarea id="bugreport-input" placeholder="Describe the bug casually, e.g.:&#10;&#10;When I click submit on the invoice form without filling in the amount, it just shows a blank page instead of an error. Happens every time on Chrome. The form should validate and show 'Amount is required'."></textarea>
+            <div class="drop-zone" id="bug-drop-zone">
+              <i data-lucide="image-plus" class="drop-zone-icon"></i>
+              <span>Drop screenshots here or <label class="drop-zone-browse" for="bug-file-input">browse</label></span>
+              <input type="file" id="bug-file-input" multiple accept="image/*" hidden />
+            </div>
+            <div class="drop-zone-previews" id="bug-previews"></div>
+            <div class="btn-row">
+              <button class="btn-primary" id="bugreport-btn">
+                <span class="btn-text"><i data-lucide="sparkles" class="btn-icon"></i> Generate Bug Report</span>
+                <span class="btn-loader" hidden>Generating...</span>
+              </button>
+              <button class="btn-jira-quick" id="quick-jira-btn"><i data-lucide="plus-circle" class="btn-icon"></i> Quick Create in Jira</button>
+            </div>
+          </div>
+          <div class="output-panel" id="bugreport-output">
+            <button class="btn-fullscreen" title="Fullscreen"><i data-lucide="maximize-2" style="width:14px;height:14px"></i></button>
+            <div class="output-placeholder">
+              <i data-lucide="bug" class="placeholder-lucide"></i>
+              <p>Bug report will appear here</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Daily Summary Tab -->
+      <section class="tab-content" id="tab-daily">
+        <div class="tab-header">
+          <div>
+            <h2><i data-lucide="bar-chart-3" class="header-icon"></i> Daily QA Summary</h2>
+            <p>Generate a standup report from your local history or directly from Jira activity.</p>
+          </div>
+        </div>
+        <div class="workspace">
+          <div class="input-panel">
+            <label>Source</label>
+            <div class="daily-source-toggle">
+              <button class="source-btn active" data-source="local" id="source-local"><i data-lucide="clock" class="btn-icon"></i> QA Copilot History</button>
+              <button class="source-btn" data-source="jira" id="source-jira"><i data-lucide="globe" class="btn-icon"></i> Jira Activity</button>
+            </div>
+
+            <div id="daily-local-fields">
+              <div class="daily-info">
+                <i data-lucide="info" class="info-icon"></i>
+                Uses today's history from QA Copilot (analyses, bugs, test cases).
+              </div>
+            </div>
+
+            <div id="daily-jira-fields" hidden>
+              <div class="modal-field">
+                <label>Jira Username</label>
+                <input type="text" id="daily-jira-user" placeholder="e.g. john.doe" />
+              </div>
+              <div class="modal-field">
+                <label>Date</label>
+                <input type="date" id="daily-jira-date" />
+              </div>
+              <div class="modal-field">
+                <label>Additional Context (optional)</label>
+                <textarea id="daily-extra" class="daily-extra-input" rows="3" placeholder="Blockers, tomorrow's plan, notes..."></textarea>
+              </div>
+            </div>
+
+            <button class="btn-primary" id="daily-generate-btn">
+              <span class="btn-text"><i data-lucide="sparkles" class="btn-icon"></i> Generate Summary</span>
+              <span class="btn-loader" hidden>Generating...</span>
+            </button>
+          </div>
+          <div class="output-panel" id="daily-output">
+            <button class="btn-fullscreen" title="Fullscreen"><i data-lucide="maximize-2" style="width:14px;height:14px"></i></button>
+            <div class="output-placeholder">
+              <i data-lucide="bar-chart-3" class="placeholder-lucide"></i>
+              <p>Daily summary will appear here</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Settings Tab -->
+      <section class="tab-content" id="tab-settings">
+        <div class="tab-header">
+          <div>
+            <h2><i data-lucide="settings" class="header-icon"></i> Settings</h2>
+            <p>Configure your defaults and integrations.</p>
+          </div>
+        </div>
+        <div class="settings-page">
+          <div class="settings-section">
+            <h3><i data-lucide="key" class="section-icon"></i> API Keys</h3>
+            <span class="settings-hint" style="display:block;margin-bottom:12px">Keys are stored in your browser only and override .env file values. Leave blank to use .env defaults.</span>
+            <div class="settings-field">
+              <label>OpenAI API Key</label>
+              <input type="password" id="settings-openai-key" placeholder="sk-..." autocomplete="off" />
+            </div>
+            <div class="settings-row">
+              <div class="settings-field">
+                <label>Jira Base URL</label>
+                <input type="text" id="settings-jira-url" placeholder="https://yourcompany.atlassian.net" />
+              </div>
+              <div class="settings-field">
+                <label>Jira Email</label>
+                <input type="text" id="settings-jira-email" placeholder="you@company.com" />
+              </div>
+            </div>
+            <div class="settings-field">
+              <label>Jira API Token</label>
+              <input type="password" id="settings-jira-token" placeholder="Your Jira API token" autocomplete="off" />
+            </div>
+            <div class="settings-row">
+              <div class="settings-field">
+                <label>Qase API Token</label>
+                <input type="password" id="settings-qase-token" placeholder="Your Qase API token" autocomplete="off" />
+              </div>
+              <div class="settings-field">
+                <label>Qase Project Code</label>
+                <input type="text" id="settings-qase-project" placeholder="e.g. MFTS" />
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3><i data-lucide="user" class="section-icon"></i> Profile</h3>
+            <div class="settings-field">
+              <label>Jira Username</label>
+              <input type="text" id="settings-jira-user" placeholder="e.g. john.doe" />
+              <span class="settings-hint">Used for Daily Summary and activity tracking</span>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3><i data-lucide="ticket" class="section-icon"></i> Jira Defaults</h3>
+            <div class="settings-row">
+              <div class="settings-field">
+                <label>Default Space</label>
+                <input type="text" id="settings-default-space" placeholder="ENG" />
+              </div>
+              <div class="settings-field">
+                <label>Default Work Type</label>
+                <select id="settings-default-type">
+                  <option value="Defect">Defect</option>
+                  <option value="Bug">Bug</option>
+                  <option value="Task">Task</option>
+                  <option value="Story">Story</option>
+                </select>
+              </div>
+            </div>
+            <div class="settings-field">
+              <label>Default Feature Team</label>
+              <select id="settings-default-team">
+                <option value="">— None —</option>
+              </select>
+              <span class="settings-hint">Auto-selected when creating bugs in Jira</span>
+            </div>
+            <div class="settings-field">
+              <label>Default Labels</label>
+              <input type="text" id="settings-default-labels" placeholder="e.g. VicPay/VP, regression (comma-separated)" />
+              <span class="settings-hint">Auto-selected when creating bugs in Jira</span>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3><i data-lucide="sparkles" class="section-icon"></i> AI</h3>
+            <div class="settings-field">
+              <label>AI Model</label>
+              <select id="settings-ai-model">
+                <option value="gpt-4o">GPT-4o (best quality)</option>
+                <option value="gpt-4o-mini">GPT-4o-mini (faster & cheaper)</option>
+              </select>
+              <span class="settings-hint">GPT-4o-mini is 10x cheaper and faster, good for simple tasks</span>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3><i data-lucide="bell" class="section-icon"></i> Notifications</h3>
+            <div class="settings-field">
+              <label>Jira Notifications</label>
+              <select id="settings-notif-enabled">
+                <option value="on">Enabled</option>
+                <option value="off">Disabled</option>
+              </select>
+              <span class="settings-hint">Get notified when tasks are assigned, comments are posted, or you're mentioned</span>
+            </div>
+            <div class="settings-field">
+              <label>Poll Interval (seconds)</label>
+              <input type="number" id="settings-notif-interval" value="60" min="15" max="300" />
+              <span class="settings-hint">How often to check Jira for new notifications (min: 15s)</span>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h3><i data-lucide="flask-conical" class="section-icon"></i> Qase</h3>
+            <div class="settings-field">
+              <label>Default Parent Suite</label>
+              <input type="text" id="settings-default-suite-parent" placeholder="e.g. Regression Tests" />
+              <span class="settings-hint">Default parent folder when pushing test cases</span>
+            </div>
+          </div>
+
+          <div class="settings-status" id="settings-status"></div>
+
+          <div class="settings-actions">
+            <button class="btn-primary" id="settings-save-btn"><i data-lucide="save" class="btn-icon"></i> Save Settings</button>
+            <button class="btn-modal-cancel" id="settings-reset-btn">Reset to Defaults</button>
+          </div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Chat FAB -->
+  <button class="chat-fab" id="chat-fab" title="AI Chat">
+    <i data-lucide="message-circle" class="chat-fab-icon"></i>
+    <i data-lucide="x" class="chat-fab-close"></i>
+  </button>
+
+  <!-- Chat Drawer -->
+  <div class="chat-drawer" id="chat-drawer" hidden>
+    <div class="chat-header">
+      <div class="chat-header-left">
+        <i data-lucide="sparkles" style="width:16px;height:16px;color:var(--accent)"></i>
+        <span>QA Copilot Chat</span>
+      </div>
+      <button class="chat-clear-btn" id="chat-clear" title="New chat">
+        <i data-lucide="trash-2" style="width:14px;height:14px"></i>
+      </button>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="chat-welcome">
+        <i data-lucide="bot" style="width:28px;height:28px;opacity:.3"></i>
+        <p>Ask me anything about QA, testing, Jira, or your workflow.</p>
+      </div>
+    </div>
+    <div class="chat-input-wrap">
+      <textarea class="chat-input" id="chat-input" rows="1" placeholder="Ask a question..."></textarea>
+      <button class="chat-send-btn" id="chat-send" title="Send">
+        <i data-lucide="arrow-up" style="width:16px;height:16px"></i>
+      </button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="/static/app.js"></script>
+  <script>lucide.createIcons();</script>
+</body>
+</html>
