@@ -17,7 +17,8 @@
 </head>
 <body>
   <div class="app">
-    <aside class="sidebar">
+    <aside class="sidebar" id="app-sidebar">
+      <button class="sidebar-pin" id="sidebar-pin" title="Toggle sidebar"><i data-lucide="panel-left-close" style="width:14px;height:14px"></i></button>
       <div class="sidebar-brand" id="sidebar-brand" role="button" tabindex="0" title="Go to Dashboard">
         <div class="brand-icon"><i data-lucide="sparkles" class="brand-lucide"></i></div>
         <h1>QA Copilot</h1>
@@ -164,6 +165,37 @@
             <div class="dash-stat-body">
               <span class="dash-stat-value" id="dash-val-total">0</span>
               <span class="dash-stat-label">Total All Time</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="dash-grid" style="margin-top:0">
+          <div class="dash-card dash-stat">
+            <div class="dash-stat-icon"><i data-lucide="cpu"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dash-val-ai-requests">0</span>
+              <span class="dash-stat-label">AI Requests</span>
+            </div>
+          </div>
+          <div class="dash-card dash-stat">
+            <div class="dash-stat-icon"><i data-lucide="hash"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dash-val-ai-tokens">0</span>
+              <span class="dash-stat-label">Est. Tokens Used</span>
+            </div>
+          </div>
+          <div class="dash-card dash-stat">
+            <div class="dash-stat-icon"><i data-lucide="timer"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dash-val-ai-time">0s</span>
+              <span class="dash-stat-label">Avg Response Time</span>
+            </div>
+          </div>
+          <div class="dash-card dash-stat">
+            <div class="dash-stat-icon"><i data-lucide="dollar-sign"></i></div>
+            <div class="dash-stat-body">
+              <span class="dash-stat-value" id="dash-val-ai-cost">$0.00</span>
+              <span class="dash-stat-label">Est. Total Cost</span>
             </div>
           </div>
         </div>

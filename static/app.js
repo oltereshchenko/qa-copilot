@@ -4,6 +4,7 @@ const HISTORY_STORAGE = 'qa-copilot-history';
 const SETTINGS_STORAGE = 'qa-copilot-settings';
 const FAVORITES_STORAGE = 'qa-copilot-favorites';
 const DRAFTS_STORAGE = 'qa-copilot-drafts';
+const AI_STATS_STORAGE = 'qa-copilot-ai-stats';
 const MAX_RECENT_KEYS = 5;
 const MAX_HISTORY = 20;
 let _uploadedFiles = [];
@@ -34,6 +35,7 @@ document.addEventListener('DOMContentLoaded', () => {
   initChat();
   initNotifications();
   initDraftPersistence();
+  initSidebarPin();
 });
 
 const _draftFields = ['analyze-input', 'testcases-input', 'bugreport-input', 'chat-input'];
@@ -71,6 +73,85 @@ document.addEventListener('keydown', (e) => {
     _activeModalClose = null;
   }
 });
+
+function getAIStats() {
+  try { return JSON.parse(localStorage.getItem(AI_STATS_STORAGE) || '{"requests":0,"totalTokens":0,"totalTimeMs":0,"totalCost":0,"sessions":[]}'); }
+  catch { return { requests: 0, totalTokens: 0, totalTimeMs: 0, totalCost: 0, sessions: [] }; }
+}
+
+function trackAIUsage(outputChars, elapsedMs, model) {
+  const stats = getAIStats();
+  const estimatedTokens = Math.ceil(outputChars / 4);
+  const costPer1k = model === 'gpt-4o-mini' ? 0.00060 : 0.01;
+  const cost = (estimatedTokens / 1000) * costPer1k;
+
+  stats.requests++;
+  stats.totalTokens += estimatedTokens;
+  stats.totalTimeMs += elapsedMs;
+  stats.totalCost += cost;
+  stats.sessions.push({ ts: Date.now(), tokens: estimatedTokens, ms: elapsedMs, cost, model });
+  if (stats.sessions.length > 200) stats.sessions = stats.sessions.slice(-200);
+  localStorage.setItem(AI_STATS_STORAGE, JSON.stringify(stats));
+}
+
+function initSidebarPin() {
+  const sidebar = document.getElementById('app-sidebar');
+  const pinBtn = document.getElementById('sidebar-pin');
+  if (!sidebar || !pinBtn) return;
+
+  if (localStorage.getItem('qa-copilot-sidebar-collapsed') === '1') {
+    sidebar.classList.add('collapsed');
+    pinBtn.innerHTML = '<i data-lucide="panel-left-open" style="width:14px;height:14px"></i>';
+    refreshIcons();
+  }
+
+  pinBtn.addEventListener('click', () => {
+    sidebar.classList.toggle('collapsed');
+    const collapsed = sidebar.classList.contains('collapsed');
+    localStorage.setItem('qa-copilot-sidebar-collapsed', collapsed ? '1' : '0');
+    pinBtn.innerHTML = collapsed
+      ? '<i data-lucide="panel-left-open" style="width:14px;height:14px"></i>'
+      : '<i data-lucide="panel-left-close" style="width:14px;height:14px"></i>';
+    refreshIcons();
+  });
+}
+
+function _fireConfetti() {
+  const container = document.createElement('div');
+  container.className = 'confetti-container';
+  const colors = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#3b82f6', '#ec4899', '#8b5cf6'];
+  for (let i = 0; i < 40; i++) {
+    const piece = document.createElement('div');
+    piece.className = 'confetti-piece';
+    piece.style.left = `${Math.random() * 100}%`;
+    piece.style.background = colors[Math.floor(Math.random() * colors.length)];
+    piece.style.animationDelay = `${Math.random() * 0.5}s`;
+    piece.style.animationDuration = `${1 + Math.random() * 1}s`;
+    piece.style.width = `${6 + Math.random() * 6}px`;
+    piece.style.height = `${6 + Math.random() * 6}px`;
+    container.appendChild(piece);
+  }
+  document.body.appendChild(container);
+  setTimeout(() => container.remove(), 2500);
+}
+
+function _animateCounter(id, target) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const num = parseInt(target) || 0;
+  if (num === 0) { el.textContent = '0'; return; }
+  const duration = 600;
+  const start = performance.now();
+  const from = parseInt(el.textContent) || 0;
+  if (from === num) return;
+  function tick(now) {
+    const progress = Math.min((now - start) / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+    el.textContent = Math.round(from + (num - from) * eased);
+    if (progress < 1) requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
 
 function initTheme() {
   const saved = localStorage.getItem(THEME_STORAGE);
@@ -396,7 +477,7 @@ function initJiraFetch() {
         textarea.classList.remove('loading-skeleton');
 
         if (data.error) {
-          showToast(`Jira error: ${data.error}`, 'error');
+          showToast(`Jira error: ${_esc(data.error)}`, 'error');
           textarea.placeholder = 'Failed to load. Try again or paste manually.';
         } else {
           textarea.value = data.text;
@@ -454,7 +535,7 @@ function showToast(message, type = 'info') {
   toast.className = `toast toast-${type}`;
   toast.innerHTML = `
     <span class="toast-icon"><i data-lucide="${iconName}"></i></span>
-    <span class="toast-msg">${_esc(message)}</span>
+    <span class="toast-msg">${message}</span>
     <button class="toast-close"><i data-lucide="x" style="width:14px;height:14px"></i></button>
   `;
 
@@ -497,6 +578,7 @@ async function streamRequest(endpoint, body, btn, outputEl, isBugReport = false,
   }, 400);
 
   body.model = getSelectedModel();
+  const _streamStartTime = performance.now();
 
   try {
     const res = await fetch(endpoint, {
@@ -514,8 +596,13 @@ async function streamRequest(endpoint, body, btn, outputEl, isBugReport = false,
         errMsg = err.error || errMsg;
       } catch {}
       contentEl.classList.remove('streaming-cursor');
-      contentEl.innerHTML = renderErrorCard(errMsg);
-      showToast(errMsg, 'error');
+      contentEl.innerHTML = renderErrorCard(errMsg, 'stream-retry');
+      refreshIcons();
+      const retryBtn = contentEl.querySelector('[data-retry="stream-retry"]');
+      if (retryBtn) retryBtn.addEventListener('click', () => {
+        streamRequest(endpoint, body, btn, outputEl, isBugReport, isTestCases, inputText, jiraKey, isAnalyze);
+      });
+      showToast(_esc(errMsg), 'error');
       return;
     }
 
@@ -543,10 +630,15 @@ async function streamRequest(endpoint, body, btn, outputEl, isBugReport = false,
 
     contentEl.classList.remove('streaming-cursor');
 
+    trackAIUsage(fullText.length, performance.now() - _streamStartTime, body.model);
+
     const actions = document.createElement('div');
     actions.className = 'output-actions';
 
     let actionsHtml = `
+      <button class="btn-regenerate" title="Regenerate with AI">
+        <i data-lucide="refresh-cw" class="btn-icon"></i> Regenerate
+      </button>
       <button class="btn-copy" data-text="${escapeAttr(fullText)}">
         <i data-lucide="clipboard" class="btn-icon"></i> Copy Markdown
       </button>
@@ -595,6 +687,13 @@ async function streamRequest(endpoint, body, btn, outputEl, isBugReport = false,
     actions.innerHTML = actionsHtml;
     outputEl.insertBefore(actions, contentEl);
     refreshIcons();
+
+    const regenBtn = actions.querySelector('.btn-regenerate');
+    if (regenBtn) {
+      regenBtn.addEventListener('click', () => {
+        streamRequest(endpoint, body, btn, outputEl, isBugReport, isTestCases, inputText, jiraKey, isAnalyze);
+      });
+    }
 
     actions.querySelectorAll('.btn-copy').forEach(copyBtn => {
       copyBtn.addEventListener('click', () => {
@@ -668,7 +767,12 @@ async function streamRequest(endpoint, body, btn, outputEl, isBugReport = false,
     clearInterval(progressInterval);
     const p = outputEl.querySelector('.ai-progress'); if (p) p.remove();
     contentEl.classList.remove('streaming-cursor');
-    contentEl.innerHTML = renderErrorCard('Connection error. Make sure the server is running.');
+    contentEl.innerHTML = renderErrorCard('Connection error. Make sure the server is running.', 'conn-retry');
+    refreshIcons();
+    const retryBtn = contentEl.querySelector('[data-retry="conn-retry"]');
+    if (retryBtn) retryBtn.addEventListener('click', () => {
+      streamRequest(endpoint, body, btn, outputEl, isBugReport, isTestCases, inputText, jiraKey, isAnalyze);
+    });
     showToast('Connection error', 'error');
   } finally {
     btn.disabled = false;
@@ -732,7 +836,7 @@ function postJiraComment(issueKey, markdown, btn) {
       closeModal();
 
       if (data.error) {
-        showToast(`Jira error: ${data.error}`, 'error');
+        showToast(`Jira error: ${_esc(data.error)}`, 'error');
       } else {
         btn.innerHTML = '<i data-lucide="check" class="btn-icon"></i> Posted!';
         refreshIcons();
@@ -750,13 +854,15 @@ function postJiraComment(issueKey, markdown, btn) {
   });
 }
 
-function renderErrorCard(message) {
+function renderErrorCard(message, retryId) {
   setTimeout(refreshIcons, 0);
+  const retryHtml = retryId ? `<button class="error-card-retry" data-retry="${retryId}"><i data-lucide="refresh-cw" style="width:12px;height:12px"></i> Retry</button>` : '';
   return `<div class="error-card">
     <div class="error-card-icon"><i data-lucide="triangle-alert" style="width:18px;height:18px;color:var(--red)"></i></div>
     <div class="error-card-body">
       <div class="error-card-title">Something went wrong</div>
       <div class="error-card-msg">${_esc(message)}</div>
+      ${retryHtml}
     </div>
   </div>`;
 }
@@ -911,7 +1017,7 @@ async function showJiraCreateDialog(markdown, btn, isQuick = false, prefilled = 
       closeModal();
 
       if (data.error) {
-        showToast(`Jira error: ${data.error}`, 'error');
+        showToast(`Jira error: ${_esc(data.error)}`, 'error');
       } else {
         if (getUploadedFileIds().length) {
           await uploadAndAttach(data.key);
@@ -927,6 +1033,7 @@ async function showJiraCreateDialog(markdown, btn, isQuick = false, prefilled = 
           }
         }
         showToast(`Created <a href="${data.url}" target="_blank">${data.key}</a> in Jira`, 'success');
+        _fireConfetti();
       }
     } catch (err) {
       closeModal();
@@ -1183,7 +1290,7 @@ async function showQasePushDialog(markdown, btn, defaultSuiteName = '') {
 
       const resultEl = document.getElementById('qase-push-result');
       if (data.error) {
-        showToast(`Qase error: ${data.error}`, 'error');
+        showToast(`Qase error: ${_esc(data.error)}`, 'error');
       } else {
         btn.innerHTML = '<i data-lucide="check" class="btn-icon"></i> Pushed!';
         refreshIcons();
@@ -1191,6 +1298,7 @@ async function showQasePushDialog(markdown, btn, defaultSuiteName = '') {
         resultEl.innerHTML = `${data.cases_created} cases → <a href="${data.suite_url}" target="_blank">Open in Qase</a>`;
         resultEl.hidden = false;
         showToast(`${data.cases_created} test cases pushed to Qase!`, 'success');
+        _fireConfetti();
       }
     } catch (err) {
       closeModal();
@@ -1532,7 +1640,7 @@ function initDailySummary() {
         const err = await res.json();
         contentEl.classList.remove('streaming-cursor');
         contentEl.innerHTML = renderErrorCard(err.error || 'Something went wrong');
-        showToast(err.error || 'Error', 'error');
+        showToast(_esc(err.error || 'Error'), 'error');
         return;
       }
 
@@ -1887,11 +1995,19 @@ function refreshDashboard() {
   const testcases = todayItems.filter(h => h.type === 'Test Cases').length;
   const bugs = todayItems.filter(h => h.type === 'Bug Report').length;
 
+  _animateCounter('dash-val-analyses', analyses);
+  _animateCounter('dash-val-testcases', testcases);
+  _animateCounter('dash-val-bugs', bugs);
+  _animateCounter('dash-val-total', history.length);
+
+  const aiStats = getAIStats();
+  _animateCounter('dash-val-ai-requests', aiStats.requests);
+  const tokenDisplay = aiStats.totalTokens > 1000 ? `${(aiStats.totalTokens / 1000).toFixed(1)}k` : String(aiStats.totalTokens);
   const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
-  el('dash-val-analyses', analyses);
-  el('dash-val-testcases', testcases);
-  el('dash-val-bugs', bugs);
-  el('dash-val-total', history.length);
+  el('dash-val-ai-tokens', tokenDisplay);
+  const avgTime = aiStats.requests > 0 ? (aiStats.totalTimeMs / aiStats.requests / 1000).toFixed(1) : '0';
+  el('dash-val-ai-time', `${avgTime}s`);
+  el('dash-val-ai-cost', `$${aiStats.totalCost.toFixed(2)}`);
 
   const recentList = document.getElementById('dash-recent-list');
   if (recentList) {
@@ -1958,8 +2074,13 @@ async function fetchDashJiraIssues() {
 
   if (!list) return;
 
-  list.innerHTML = '<div class="dash-empty"><i data-lucide="loader" class="spin" style="width:16px;height:16px"></i> Loading...</div>';
-  refreshIcons();
+  list.innerHTML = `<div class="skeleton-board">
+    ${[1,2,3,4].map(() => `<div class="skeleton-col">
+      <div class="skeleton skeleton-col-header"></div>
+      <div class="skeleton skeleton-card"></div>
+      <div class="skeleton skeleton-card"></div>
+    </div>`).join('')}
+  </div>`;
   if (refreshBtn) refreshBtn.classList.add('loading');
 
   try {
@@ -2206,6 +2327,7 @@ const SPRINT_BOARDS = [
 async function fetchSprintWidget() {
   const container = document.getElementById('dash-sprint');
   if (!container) return;
+  container.innerHTML = '<div class="skeleton skeleton-sprint"></div>';
   try {
     const settings = getSettings();
     const boardId = settings.sprintBoardId || 286;
@@ -3070,6 +3192,26 @@ function renderNotifications(notifs) {
       body: firstUnseen.text, icon: '/favicon.ico',
     });
   }
+
+  if (count > 0) _playNotifSound();
+}
+
+function _playNotifSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(880, ctx.currentTime);
+    osc.frequency.setValueAtTime(1100, ctx.currentTime + 0.08);
+    osc.frequency.setValueAtTime(880, ctx.currentTime + 0.16);
+    gain.gain.setValueAtTime(0.08, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.3);
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.3);
+  } catch {}
 }
 
 function _timeAgo(dateStr) {
